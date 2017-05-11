@@ -1,12 +1,14 @@
+# This script loads Allen Brain Institute of Science models in blender based on a supplied ontology
+# Here's an example of how to call it:
+#		blender -P loadInBlender.py -- --ontologyPath "path/to/ontology.json" --objsDir "path/to/dir/with/*.obj"
+
 import bpy
 import sys
 import os
 import argparse
 import os.path
 import logging
-import bmesh
 import json
-from allensdk.core.structure_tree import StructureTree
 
 # Setup logging
 root = logging.getLogger()
@@ -17,8 +19,13 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 
-# setup consts
-MODELS_ROOT = 'D:\Apps\AllenBrainInstituteOfScience\ccf-models'
+# Parse the arguments expected by this script
+parser = argparse.ArgumentParser(description='Process arguments')
+parser.add_argument('--ontologyPath', required="true", help="Path to the ontology");
+parser.add_argument('--objsDir', required="true", help="Folder containing the obj files");
+
+# All arguments after the "--" are for this script
+args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:]);
 
 # Get an RGB dict from the hex string
 # Borrowed from https://gist.github.com/dyf/51b25bddfc3338c5cdf3311402dc3610
@@ -61,7 +68,7 @@ def center_everything ():
 # Loads the structure's obj in blender
 def load_structure_obj (structure, structure_to_obj_dict):
 	# Load this structure's obj file
-	modelPath = os.path.join(MODELS_ROOT, str(structure['id']) + '.obj')
+	modelPath = os.path.join(args.objsDir, structure['id'] + '.obj')
 	if os.path.isfile(modelPath):
 		# Deselect all selected objs
 		logging.info('Deselecting all selected objs')
@@ -108,7 +115,7 @@ def load_structure_obj (structure, structure_to_obj_dict):
 			logging.info('Making obj a parent of ' + parent_id)
 
 			# Get the objs parent
-			parent = structure_to_obj_dict[ int(parent_id) ]
+			parent = structure_to_obj_dict[ parent_id ]
 
 			# Update the parent child relationship
 			obj.select = True
@@ -126,29 +133,15 @@ def load_structure_obj (structure, structure_to_obj_dict):
 		return None
 
 def load_models_in_ontology ():
-	ontology_path = os.path.join(MODELS_ROOT, 'mouse-brain-ontology.json')
-	structures = json.load(open(ontology_path,'r'))
-
-	# workaround for a bug in StructureTree.clean_structures that I just found
-	for s in structures:
-		s['id'] = int(s['id'])
-		s['structure_sets'] = []
-	    
-	# clean up the input to what StructureTree wants
-	#clean_structures = StructureTree.clean_structures(structures)
-
-	# Make a StructureTree
-	#st = StructureTree(structures)
+	structures = json.load(open(args.ontologyPath,'r'))
 
 	# maps a structures obj to its id
 	structure_to_obj_dict = {}
 
-	for s in structures:
-		s_id = s['id']
-		#structure = next(st.get_structures_by_id([ s_id ]))
-		obj = load_structure_obj(s, structure_to_obj_dict)
+	for structure in structures:
+		obj = load_structure_obj(structure, structure_to_obj_dict)
 		if obj is not None:
-			structure_to_obj_dict[ s['id'] ] = obj
+			structure_to_obj_dict[ structure['id'] ] = obj
 
 load_models_in_ontology()
 center_everything()
